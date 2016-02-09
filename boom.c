@@ -57,14 +57,14 @@
 #define BUTTON_MINUS			2
 #define BUTTON_CORRECTION		3
 
-#define AIM_ANGLE_MAX	200.0
+#define AIM_ANGLE_MAX	125.0
 #define AIM_ANGLE_MIN	0
-#define AIM_ANGLE_MECHANICAL_CORRECTION 0.0
+#define AIM_ANGLE_MECHANICAL_CORRECTION 15.0
 
 #define AIM_ANGLE_DELTA 1.0
 #define ZERRO_ANGLE_DELTA 5.5
 
-#define DEFAULTE_AIM_ANGLE 90
+#define DEFAULTE_AIM_ANGLE 45
 #define DEFAULTE_ZERRO_ANGLE 0
 
 #define DEFAULTE_ANGLE_CORRECTION 0
@@ -265,7 +265,7 @@ char 	isInWork()
 //	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta) && last_angle != cuurent_angle ){
 //	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
 		// текущий угол больше предыдущего и больше чем нулевая точка с учетом люфта
-	if (cuurent_angle > last_angle && cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
+	if (cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)) {
 		last_angle = cuurent_angle;
 		return 1;
 	}
@@ -288,6 +288,7 @@ void workWithUser()
 			case BUTTON_PLUS:
 			case BUTTON_MINUS:
 				changeAimAngle(button);
+				lcdPrintFinalAngle(gl_aim_entered_angle);
 				break;
 			default:
 				break;
@@ -301,18 +302,18 @@ void 	angleControl()
 {
 	float cuurent_angle = getCurAngle(); 
 
-	const print_tact_val = 20;
+	const char print_tact_val = 20;
 	char print_tact = print_tact_val;	
 
 
 	// controll angle up
-	while ( cuurent_angle <= gl_aim_angle ) {
-		if (!print_tact--){
+	while ( cuurent_angle <= (gl_aim_angle + gl_correction + AIM_ANGLE_MECHANICAL_CORRECTION) ) {
+/*		if (!print_tact--){
 			lcdPrintCurrentlAngle (cuurent_angle);
 			print_tact = print_tact_val;
 		}
-		cuurent_angle = getCurAngle(); 
-		_delay_ms(5);
+*/		cuurent_angle = getCurAngle(); 
+		_delay_ms(2);
 	}
 	
 	setRelay(RELAY_ON);
@@ -326,11 +327,14 @@ void 	angleControl()
 	// больше не ждем достижения минимального угла
 
 	// controll angle down
-	//while ( cuurent_angle > gl_zerro_angle + gl_zerro_angle_delta) {
-	//	lcdPrintCurrentlAngle (cuurent_angle);
-	//	cuurent_angle = getCurAngle(); 
-	//	_delay_ms(100);
-	//}
+	while ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)) {
+		if (!print_tact--){
+			lcdPrintCurrentlAngle (cuurent_angle);
+			print_tact = print_tact_val;
+		}
+		cuurent_angle = getCurAngle(); 
+		_delay_ms(5);
+	}
 	
 	
 }
@@ -345,15 +349,20 @@ void 	changeAimAngle(char button)
 	if( button == BUTTON_MINUS)	{
 		if (gl_aim_entered_angle <= AIM_ANGLE_MIN) // не позволим задать угол меньше мининмума
 			return;
-		step = 0 - gl_aim_angle_delta;
+		gl_aim_entered_angle -= step;
+		gl_aim_angle = gl_aim_entered_angle;
+//		gl_aim_angle += gl_correction;
+//		gl_aim_angle += AIM_ANGLE_MECHANICAL_CORRECTION;
+		lcdPrintFinalAngle(gl_aim_entered_angle);
+	}else{
+		if (gl_aim_entered_angle >= AIM_ANGLE_MAX) // не позволим задать угол больше максимума
+			return;
+		gl_aim_entered_angle += step;
+		gl_aim_angle = gl_aim_entered_angle;
+//		gl_aim_angle += gl_correction;
+//		gl_aim_angle += AIM_ANGLE_MECHANICAL_CORRECTION;
+		lcdPrintFinalAngle(gl_aim_entered_angle);
 	}
-
-	if (gl_aim_entered_angle >= AIM_ANGLE_MAX) // не позволим задать угол больше максимума
-		return;
-
-	gl_aim_entered_angle += step;
-	gl_aim_angle = gl_aim_entered_angle + gl_correction + AIM_ANGLE_MECHANICAL_CORRECTION;
-	lcdPrintFinalAngle(gl_aim_entered_angle);
 }
 
 //---------------------------------------------------------------
@@ -423,6 +432,7 @@ char 	setRelay(char relay_state)
 		DOWNBIT(RELAYPORT, RELAYPIN2);
 		DOWNBIT(PORTE,5);
 	}
+	return 0;
 }
 
 //-----------------------------------------------------------------
@@ -438,7 +448,7 @@ float 	getCurAngle()
 
 	float angle = (360.0 / DIMENTION ) * enc_val;
 
-	float countered_angle = angle - gl_logic_zerro_angle_correction;
+	float countered_angle = angle + gl_logic_zerro_angle_correction;
 
 	// сделаем дельту положительной
 	if ( countered_angle < 0)
