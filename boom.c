@@ -82,18 +82,18 @@
 /////////////// global vars and util functions
 //////////////////////////////////////////////////
 
-float gl_aim_angle = DEFAULTE_AIM_ANGLE;
-float gl_aim_angle_delta = AIM_ANGLE_DELTA;
-float gl_aim_entered_angle = DEFAULTE_AIM_ANGLE;
+volatile float gl_aim_angle = DEFAULTE_AIM_ANGLE;
+volatile float gl_aim_angle_delta = AIM_ANGLE_DELTA;
+volatile float gl_aim_entered_angle = DEFAULTE_AIM_ANGLE;
 
-float gl_zerro_angle = DEFAULTE_ZERRO_ANGLE;
-float gl_zerro_angle_delta = ZERRO_ANGLE_DELTA;
+volatile float gl_zerro_angle = DEFAULTE_ZERRO_ANGLE;
+volatile float gl_zerro_angle_delta = ZERRO_ANGLE_DELTA;
 
-float gl_correction = DEFAULTE_ANGLE_CORRECTION;
-float gl_correction_step = DEFAULTE_ANGLE_CORRECTION_STEP;
-float gl_logic_zerro_angle_correction = LOGIC_ZERRO_CORRECTION;
+volatile float gl_correction = DEFAULTE_ANGLE_CORRECTION;
+volatile float gl_correction_step = DEFAULTE_ANGLE_CORRECTION_STEP;
+volatile float gl_logic_zerro_angle_correction = LOGIC_ZERRO_CORRECTION;
 
-char gl_state = ST_INIT;
+volatile char gl_state = ST_INIT;
 
 //////////////////////////////////////////////////
 
