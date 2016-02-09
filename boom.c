@@ -50,11 +50,16 @@
 
 #define RELAY_ON		1
 #define RELAY_OFF		0
+#define RELAY_WAIT_TIME 1000
 
 #define BUTTON_NONE				0
 #define BUTTON_PLUS 			1
 #define BUTTON_MINUS			2
 #define BUTTON_CORRECTION		3
+
+#define AIM_ANGLE_MAX	200.0
+#define AIM_ANGLE_MIN	0
+#define AIM_ANGLE_MECHANICAL_CORRECTION 0.0
 
 #define AIM_ANGLE_DELTA 0.5
 #define ZERRO_ANGLE_DELTA 0.5
@@ -189,8 +194,8 @@ void 	lcdInit()
 
 void	lcdPrintHello()
 {
-	char message1 [LCD_TEXT_LEN] = {' ','H','E','L','L','O','!','!','!',' ',' ',' ',' ',' ',' ',' ',0};
-	char message2 [LCD_TEXT_LEN] = {' ','B','E','N','D','E','R',' ','1','.','0',' ',' ',' ',' ',' ',0};
+	char message1 [LCD_TEXT_LEN] = {'B','E','N','D','E','R',' ','1','.','0',' ',' ',' ',' ',' ',' ',0};
+	char message2 [LCD_TEXT_LEN] = {'B','L','O','B','B','Y','@','Y','A','N','D','E','X','.','R','U',0};
 	LCDSendCommand(CLR_DISP);
 	LCDSendCommand(DD_RAM_ADDR);
 	LCDSendTxt(message1);
@@ -298,6 +303,10 @@ void 	angleControl()
 	
 	setRelay(RELAY_ON);
 
+	_delay_ms(RELAY_WAIT_TIME);
+
+	setRelay(RELAY_OFF);
+
 	// controll angle down
 	while ( cuurent_angle > gl_zerro_angle ) {
 		lcdPrintCurrentlAngle (cuurent_angle);
@@ -305,7 +314,7 @@ void 	angleControl()
 		_delay_ms(100);
 	}
 	
-	setRelay(RELAY_OFF);
+	
 }
 
 //---------------------------------------------------------------
@@ -316,11 +325,16 @@ void 	changeAimAngle(char button)
 
 
 	if( button == BUTTON_MINUS)	{
+		if (gl_aim_entered_angle <= AIM_ANGLE_MIN) // не позволим задать угол меньше мининмума
+			return;
 		step = 0 - gl_aim_angle_delta;
 	}
 
+	if (gl_aim_entered_angle >= AIM_ANGLE_MAX) // не позволим задать угол больше максимума
+		return;
+
 	gl_aim_entered_angle += step;
-	gl_aim_angle = gl_aim_entered_angle + gl_correction;
+	gl_aim_angle = gl_aim_entered_angle + gl_correction + AIM_ANGLE_MECHANICAL_CORRECTION;
 	lcdPrintFinalAngle(gl_aim_entered_angle);
 }
 
@@ -466,7 +480,6 @@ char 	getButton(char * button_code)
 	// check button correction
 	if (but_port_state & (1 << BUTTON_CORRECTION_PIN)) {
 		if (button_corr_was_released){
-			INVBIT(PORTE,5);
 			button_corr_was_released = 0;
 			* button_code = BUTTON_CORRECTION;		
 			return * button_code;
