@@ -11,26 +11,32 @@
 
 #define LCDPORT 		PORTC
 #define LCDDDRPORT		DDRC
-#define RELAYPORT		PORTB
-#define RELAYDDRPORT 	DDRB
+#define RELAYPORT		PORTD
+#define RELAYDDRPORT 	DDRD
 #define	BUTTONPORT		PORTA
 #define BUTTONDDRPORT	DDRA
 #define ENCODERPORT2	PORTA
 #define ENCODERDDRPORT2	DDRA
-#define ENCODERPORT		PORTD
-#define ENCODERDDRPORT	DDRD
+#define ENCODERPORT		PORTF
+#define ENCODERDDRPORT	DDRF
 
 #define RELAYPIN1	0
 #define RELAYPIN2	1
 
-#define BUTTON_PLUS_PIN			3
-#define BUTTON_MINUS_PIN		4
-#define BUTTON_CORRECTION_PIN 	5
+#define BUTTON_PLUS_PIN			2
+#define BUTTON_MINUS_PIN		3
+#define BUTTON_CORRECTION_PIN 	4
 
 
-#define BUTTONPIN 	(PINA & (1 << BUTTON_PLUS_PIN) & (1 << BUTTON_MINUS_PIN) & (1 << BUTTON_CORRECTION_PIN)) 
-#define ENCODERPIN	(PIND & 0b11111111)
-#define ENCODERPIN2 (PINA & 0b00000011)
+#define BUTTONPIN 	(PINA & ((1 << BUTTON_PLUS_PIN) | (1 << BUTTON_MINUS_PIN) | (1 << BUTTON_CORRECTION_PIN))) 
+
+#define ENCODERPINMASK 0b11111111
+#define ENCODERPIN2MASK 0b00000011
+
+
+#define ENCODERPIN	(PINF & ENCODERPINMASK)
+#define ENCODERPIN2 (PINA & ENCODERPIN2MASK)
+
 
 
 
@@ -110,6 +116,11 @@ void 	angleControl();
 void	workWithUser();										
 //////////////////////////////////////////////////
 //////////////////////////////////////////////////
+#define INVBIT(port, bit) port = port ^ (1<<bit);
+#define UPBIT(port, bit) port = port | (1<<bit);
+#define DOWNBIT(port, bit) port = port & (~(1<<bit));
+
+
 
 
 int 	main()
@@ -122,6 +133,17 @@ int 	main()
 	
 	lcdPrintFinalAngle(gl_aim_entered_angle);
 	lcdPrintCurrentlAngle(getCurAngle());
+
+/*
+	while (1){
+
+	lcdPrintCurrentlAngle(getCurAngle());
+	_delay_ms(500);
+	INVBIT(PORTE, 5);
+
+	}
+*/
+
 
 	while (1) 
 	{
@@ -150,6 +172,8 @@ void 	portInit()
 	BUTTONPORT = 0b00000000;		BUTTONDDRPORT = BUTTONDDRPORT | 0b00000000;
 	RELAYPORT = 0b00000000;			RELAYDDRPORT = RELAYDDRPORT | (1 << RELAYPIN1) | (1 << RELAYPIN2);
 	ENCODERPORT = 0b00000000;		ENCODERDDRPORT = ENCODERDDRPORT | 0b00000000;
+	
+	PORTE = 0; DDRE = 0b00001100;
 }
 
 //--------------------------------------------------------------
@@ -179,9 +203,12 @@ void	lcdPrintHello()
 void 	lcdPrintCorrection(float val)
 {
 	char message [LCD_TEXT_LEN] = {'C','o','r','r','e','c','t','.',':',' ',' ',' ',' ',' ',' ',' ',0};
-	const char digit_pos = 11;
+	const char digit_pos = 9;
 	LCDSendCommand(CLR_DISP);
-	sprintf(&message[digit_pos], "%f", gl_correction);
+	if (val >= 0)
+		sprintf(&message[digit_pos], "%d.%d    ", (int)(val / 1), (int)(val * 10) % 10);
+	else
+		sprintf(&message[digit_pos], "-%d.%d    ", (int)((0 - val) / 1), (int)((0 - val) * 10) % 10);	
 	LCDSendTxt(message);
 }
 
@@ -192,7 +219,10 @@ void 	lcdPrintFinalAngle(float val)
 	char message [LCD_TEXT_LEN] = {'S','E','T',':',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',0};
 	const char digit_pos = 5;
 	LCDSendCommand(DD_RAM_ADDR);
-	sprintf(&message[digit_pos], "%f", val);
+	if (val >= 0)
+		sprintf(&message[digit_pos], "%d.%d    ", (int)(val / 1), (int)(val * 10) % 10);
+	else
+		sprintf(&message[digit_pos], "-%d.%d    ", (int)((0 - val) / 1), (int)((0 - val) * 10) % 10);	
 	LCDSendTxt(message);
 }
 
@@ -203,7 +233,10 @@ void 	lcdPrintCurrentlAngle(float val)
 	char message [LCD_TEXT_LEN] = {'C','U','R',':',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',0};
 	const char digit_pos = 5;
 	LCDSendCommand(DD_RAM_ADDR2);
-	sprintf(&message[digit_pos], "%f", val);
+	if (val >= 0)
+		sprintf(&message[digit_pos], "%d.%d    ", (int)(val / 1), (int)(val * 10) % 10);
+	else
+		sprintf(&message[digit_pos], "-%d.%d    ", (int)((0 - val) / 1), (int)((0 - val) * 10) % 10);	
 	LCDSendTxt(message);
 }
 
@@ -213,6 +246,12 @@ char 	isInWork()
 {
 	static float last_angle = DEFAULTE_ZERRO_ANGLE;
 	float cuurent_angle = getCurAngle();
+
+	if ( cuurent_angle != last_angle){
+		lcdPrintCurrentlAngle (cuurent_angle);
+		last_angle = cuurent_angle;	
+	}
+
 //	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta) && last_angle != cuurent_angle ){
 	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
 		last_angle = cuurent_angle;
@@ -251,7 +290,7 @@ void 	angleControl()
 	float cuurent_angle = getCurAngle(); 
 	
 	// controll angle up
-	while ( cuurent_angle < gl_aim_angle ) {
+	while ( cuurent_angle <= gl_aim_angle ) {
 		lcdPrintCurrentlAngle (cuurent_angle);
 		cuurent_angle = getCurAngle(); 
 		_delay_ms(100);
@@ -274,6 +313,7 @@ void 	angleControl()
 void 	changeAimAngle(char button)
 {
 	float step = gl_aim_angle_delta;
+
 
 	if( button == BUTTON_MINUS)	{
 		step = 0 - gl_aim_angle_delta;
@@ -303,22 +343,37 @@ void 	changeCorrection(char button)
 void 	setCorrection()
 {
 	lcdPrintCorrection(gl_correction);
-	char button = 0;
-	while (1)
+
+	const long WAITEXIT = 500;
+	long wait_exit = WAITEXIT;
+	char sbutton = 0;
+	while (wait_exit--)
 	{
-		if(getButton(& button))
+
+		char t = getButton(& sbutton);
+		if(t)
 		{
-			if(button == BUTTON_CORRECTION){
-				lcdPrintFinalAngle(gl_aim_entered_angle);
-				lcdPrintCurrentlAngle(getCurAngle());
-				return;
-			}
-			if(button == BUTTON_PLUS || button == BUTTON_MINUS){
-				changeCorrection(button);
+			switch (t)
+			{
+				case BUTTON_CORRECTION:
+					lcdPrintFinalAngle(gl_aim_entered_angle);
+					lcdPrintCurrentlAngle(getCurAngle());
+					return;
+					break;			
+				case BUTTON_PLUS:
+				case BUTTON_MINUS:
+					changeCorrection(t);
+					wait_exit = WAITEXIT;
+					break;
+				default:
+					break;
 			}
 		}
 		_delay_ms(10);
 	}
+
+	lcdPrintFinalAngle(gl_aim_entered_angle);
+	lcdPrintCurrentlAngle(getCurAngle());
 	return;
 }
 
@@ -340,12 +395,15 @@ char 	setRelay(char relay_state)
 
 float 	getCurAngle()
 {
+
 	long enc_val = 0;
 	char * enc_val_p = &enc_val;
-	*enc_val_p = ENCODERPIN2;
+	*enc_val_p = (ENCODERPIN ^ 0xFF ) & ENCODERPINMASK;
 	enc_val_p++;
-	*enc_val_p = ENCODERPIN;
-	
+	*enc_val_p = (ENCODERPIN2 ^ 0xFF) & ENCODERPIN2MASK;
+
+
+
 	float angle = (360.0 / DIMENTION ) * enc_val;
 	return angle;
 }
@@ -360,10 +418,15 @@ char 	getButton(char * button_code)
 	
 	static char button_plus_pressed_cicles = 0;
 	static char button_minus_pressed_cicles = 0;
-	const char button_pressed_cicles_max = 20;
+	const char button_pressed_cicles_max = 35;
 	
 	char but_port_state = BUTTONPIN;
-	
+
+	INVBIT (but_port_state, BUTTON_PLUS_PIN);
+	INVBIT (but_port_state, BUTTON_MINUS_PIN);
+	INVBIT (but_port_state, BUTTON_CORRECTION_PIN);
+
+
 	// check button plus
 	if (but_port_state & (1 << BUTTON_PLUS_PIN)) {
 		if (button_plus_was_released){
@@ -403,6 +466,7 @@ char 	getButton(char * button_code)
 	// check button correction
 	if (but_port_state & (1 << BUTTON_CORRECTION_PIN)) {
 		if (button_corr_was_released){
+			INVBIT(PORTE,5);
 			button_corr_was_released = 0;
 			* button_code = BUTTON_CORRECTION;		
 			return * button_code;
