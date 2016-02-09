@@ -61,18 +61,20 @@
 #define AIM_ANGLE_MIN	0
 #define AIM_ANGLE_MECHANICAL_CORRECTION 0.0
 
-#define AIM_ANGLE_DELTA 0.5
-#define ZERRO_ANGLE_DELTA 0.5
+#define AIM_ANGLE_DELTA 1.0
+#define ZERRO_ANGLE_DELTA 5.5
 
 #define DEFAULTE_AIM_ANGLE 90
 #define DEFAULTE_ZERRO_ANGLE 0
 
 #define DEFAULTE_ANGLE_CORRECTION 0
-#define DEFAULTE_ANGLE_CORRECTION_STEP 0.1
+#define DEFAULTE_ANGLE_CORRECTION_STEP 0.5
 
 #define LCD_FIRST_LINE 1
 #define LCD_SECOND_LINE 2
 #define LCD_TEXT_LEN 17
+
+#define LOGIC_ZERRO_CORRECTION 0.0
 
 #define DIMENTION 1024.0
 
@@ -89,6 +91,7 @@ float gl_zerro_angle_delta = ZERRO_ANGLE_DELTA;
 
 float gl_correction = DEFAULTE_ANGLE_CORRECTION;
 float gl_correction_step = DEFAULTE_ANGLE_CORRECTION_STEP;
+float gl_logic_zerro_angle_correction = LOGIC_ZERRO_CORRECTION;
 
 char gl_state = ST_INIT;
 
@@ -134,7 +137,7 @@ int 	main()
 	lcdInit();
 	lcdPrintHello();
 
-	_delay_ms(3000);
+	gl_logic_zerro_angle_correction = getCurAngle();
 	
 	lcdPrintFinalAngle(gl_aim_entered_angle);
 	lcdPrintCurrentlAngle(getCurAngle());
@@ -201,6 +204,8 @@ void	lcdPrintHello()
 	LCDSendTxt(message1);
 	LCDSendCommand(DD_RAM_ADDR2);
 	LCDSendTxt(message2);
+	_delay_ms(3000);
+	LCDSendCommand(CLR_DISP);
 }
 
 //----------------------------------------------------------------
@@ -258,7 +263,9 @@ char 	isInWork()
 	}
 
 //	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta) && last_angle != cuurent_angle ){
-	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
+//	if ( cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
+		// текущий угол больше предыдущего и больше чем нулевая точка с учетом люфта
+	if (cuurent_angle > last_angle && cuurent_angle > (gl_zerro_angle + gl_zerro_angle_delta)){
 		last_angle = cuurent_angle;
 		return 1;
 	}
@@ -293,26 +300,37 @@ void workWithUser()
 void 	angleControl()
 {
 	float cuurent_angle = getCurAngle(); 
-	
+
+	const print_tact_val = 20;
+	char print_tact = print_tact_val;	
+
+
 	// controll angle up
 	while ( cuurent_angle <= gl_aim_angle ) {
-		lcdPrintCurrentlAngle (cuurent_angle);
+		if (!print_tact--){
+			lcdPrintCurrentlAngle (cuurent_angle);
+			print_tact = print_tact_val;
+		}
 		cuurent_angle = getCurAngle(); 
-		_delay_ms(100);
+		_delay_ms(5);
 	}
 	
 	setRelay(RELAY_ON);
+
+	lcdPrintCurrentlAngle (cuurent_angle);
 
 	_delay_ms(RELAY_WAIT_TIME);
 
 	setRelay(RELAY_OFF);
 
+	// больше не ждем достижения минимального угла
+
 	// controll angle down
-	while ( cuurent_angle > gl_zerro_angle ) {
-		lcdPrintCurrentlAngle (cuurent_angle);
-		cuurent_angle = getCurAngle(); 
-		_delay_ms(100);
-	}
+	//while ( cuurent_angle > gl_zerro_angle + gl_zerro_angle_delta) {
+	//	lcdPrintCurrentlAngle (cuurent_angle);
+	//	cuurent_angle = getCurAngle(); 
+	//	_delay_ms(100);
+	//}
 	
 	
 }
@@ -397,11 +415,13 @@ char 	setRelay(char relay_state)
 {
 	if ( relay_state == RELAY_ON ){
 		UPBIT(RELAYPORT, RELAYPIN1);
-		DOWNBIT(RELAYPORT, RELAYPIN2);
+		UPBIT(RELAYPORT, RELAYPIN2);
+		UPBIT(PORTE,5);
 	}
 	else{
 		DOWNBIT(RELAYPORT, RELAYPIN1);
-		UPBIT(RELAYPORT, RELAYPIN2);
+		DOWNBIT(RELAYPORT, RELAYPIN2);
+		DOWNBIT(PORTE,5);
 	}
 }
 
@@ -416,10 +436,19 @@ float 	getCurAngle()
 	enc_val_p++;
 	*enc_val_p = (ENCODERPIN2 ^ 0xFF) & ENCODERPIN2MASK;
 
-
-
 	float angle = (360.0 / DIMENTION ) * enc_val;
-	return angle;
+
+	float countered_angle = angle - gl_logic_zerro_angle_correction;
+
+	// сделаем дельту положительной
+	if ( countered_angle < 0)
+		countered_angle = 0 - countered_angle;
+
+	// проверим не было ли перехода из 360 в 0
+	if ( countered_angle > 180.0)
+		countered_angle = 360 - countered_angle;
+			
+	return countered_angle;
 }
 
 //-----------------------------------------------------------------
